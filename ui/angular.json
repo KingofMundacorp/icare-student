@@ -80,12 +80,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
             "proxyConfig": "proxy-config.json",
-            "buildTarget": "icare-ui:build",
             "browserTarget": "icare-ui:build"
           },
           "configurations": {
             "production": {
-              "buildTarget": "icare-ui:build:production",
               "browserTarget": "icare-ui:build:production"
             }
           }
