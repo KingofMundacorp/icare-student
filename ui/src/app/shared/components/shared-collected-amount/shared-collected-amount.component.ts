@@ -9,7 +9,7 @@ import { formatDateToYYMMDD } from "../../helpers/format-date.helper";
 @Component({
   selector: "app-shared-collected-amount",
   templateUrl: "./shared-collected-amount.component.html",
-  styleUrls: "./shared-collected-amount.component.scss",
+  styleUrls: ["./shared-collected-amount.component.scss"],
 })
 export class SharedCollectedAmountComponent implements OnInit {
   soldItemsByAmountDetails$: Observable<SoldItemsAmount[]>;
