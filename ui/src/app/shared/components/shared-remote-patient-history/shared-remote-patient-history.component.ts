@@ -7,7 +7,7 @@ import { FormValue } from "../../modules/form/models/form-value.model";
 @Component({
   selector: "app-shared-remote-patient-history",
   templateUrl: "./shared-remote-patient-history.component.html",
-  styleUrl: "./shared-remote-patient-history.component.scss",
+  styleUrls: ["./shared-remote-patient-history.component.scss"],
 })
 export class SharedRemotePatientHistoryComponent implements OnInit {
   @Input() patient: any;
