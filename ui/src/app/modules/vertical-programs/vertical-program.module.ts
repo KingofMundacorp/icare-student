@@ -1,7 +1,7 @@
 import { NgModule } from "@angular/core";
 import { CommonModule } from "@angular/common";
 
-import { VerticalProgramsRoutingModule } from "./verical-program-routing.module";
+import { VerticalProgramRoutingModule } from './verical-program-routing.module';
 import { clinicPages } from "./pages";
 import { SharedModule } from "../../shared/shared.module";
 import { clinicComponents } from "./components";
@@ -15,6 +15,10 @@ import { PatientEnrollmentsComponent } from "./components/patient-enrollments/pa
     PatientEnrollmentsComponent,
   ],
   providers: [...programServices],
-  imports: [CommonModule, VerticalProgramsRoutingModule, SharedModule],
+  imports: [
+    CommonModule, 
+    VerticalProgramRoutingModule, 
+    SharedModule
+  ],
 })
 export class VerticalProgramsModule {}
