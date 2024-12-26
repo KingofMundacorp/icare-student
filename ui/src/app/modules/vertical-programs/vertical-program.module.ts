@@ -7,6 +7,7 @@ import { SharedModule } from "../../shared/shared.module";
 import { clinicComponents } from "./components";
 import { programServices } from "./services";
 import { PatientEnrollmentsComponent } from "./components/patient-enrollments/patient-enrollments.component";
+import { MatCardModule } from '@angular/material/card';
 
 @NgModule({
   declarations: [
@@ -18,7 +19,8 @@ import { PatientEnrollmentsComponent } from "./components/patient-enrollments/pa
   imports: [
     CommonModule, 
     VerticalProgramRoutingModule, 
-    SharedModule
+    SharedModule,
+    MatCardModule,
   ],
 })
 export class VerticalProgramsModule {}

@@ -8,7 +8,7 @@ import { getAllPaymentTypes } from "src/app/store/selectors/payment-type.selecto
 @Component({
   selector: "app-lab-price-list-home",
   templateUrl: "./lab-price-list-home.component.html",
-  styleUrl: "./lab-price-list-home.component.scss",
+  styleUrls: ["./lab-price-list-home.component.scss"],
 })
 export class LabPriceListHomeComponent implements OnInit {
   @Input() paymentCategories: any[];
