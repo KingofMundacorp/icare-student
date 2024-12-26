@@ -1,4 +1,4 @@
-import { Component, OnInit } from "@angular/core";
+import { Component, Inject, OnInit } from "@angular/core";
 import { Store } from "@ngrx/store";
 import { Observable } from "rxjs";
 import { loadConceptByUuid } from "src/app/store/actions";
@@ -12,7 +12,7 @@ import { getConceptById } from "src/app/store/selectors";
 })
 export class LabPriceListHomeContainerComponent implements OnInit {
   paymentCategories$: Observable<any>;
-  constructor(private store: Store<AppState>) {}
+  constructor(@Inject(Store) private store: Store<AppState>) {}
   ngOnInit(): void {
     // TODO: Save the uuid on global properties, and switch-map accordingly
     this.store.dispatch(
