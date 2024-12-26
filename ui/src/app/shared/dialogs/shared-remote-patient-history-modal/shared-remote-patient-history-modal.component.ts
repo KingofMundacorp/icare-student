@@ -6,7 +6,7 @@ import { Observable } from "rxjs";
 @Component({
   selector: "app-shared-remote-patient-history-modal",
   templateUrl: "./shared-remote-patient-history-modal.component.html",
-  styleUrl: "./shared-remote-patient-history-modal.component.scss",
+  styleUrls: ["./shared-remote-patient-history-modal.component.scss"],
 })
 export class SharedRemotePatientHistoryModalComponent implements OnInit {
   remotePatientHistory$: Observable<any>;
