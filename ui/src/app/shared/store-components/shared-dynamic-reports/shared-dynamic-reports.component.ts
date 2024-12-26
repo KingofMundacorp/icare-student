@@ -5,7 +5,7 @@ import { Observable } from "rxjs";
 @Component({
   selector: "app-shared-dynamic-reports",
   templateUrl: "./shared-dynamic-reports.component.html",
-  styleUrl: "./shared-dynamic-reports.component.scss",
+  styleUrls: ["./shared-dynamic-reports.component.scss"],
 })
 export class SharedDynamicReportsComponent implements OnInit {
   summaryReportCost$: Observable<any>;
