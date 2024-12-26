@@ -8,7 +8,7 @@ import { getConceptById } from "src/app/store/selectors";
 @Component({
   selector: "app-lab-price-list-home-container",
   templateUrl: "./lab-price-list-home-container.component.html",
-  styleUrl: "./lab-price-list-home-container.component.scss",
+  styleUrls: ["./lab-price-list-home-container.component.scss"],
 })
 export class LabPriceListHomeContainerComponent implements OnInit {
   paymentCategories$: Observable<any>;
