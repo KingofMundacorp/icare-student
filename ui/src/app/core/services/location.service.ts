@@ -87,6 +87,23 @@ export class LocationService {
       );
   }
 
+  getLocationAttributesByLocationUuid(uuid): Observable<any> {
+    return this.httpClient
+      .get(
+        "location/" +
+          uuid +
+          "?v=custom:(uuid,attributes:(attributeType,uuid,value,voided))"
+      )
+      .pipe(
+        map((response) => {
+          return response?.attributes && response?.attributes?.length > 0
+            ? response?.attributes.filter((attribute) => !attribute?.voided)
+            : [];
+        }),
+        catchError((error) => of(error))
+      );
+  }
+
   getLocationByIds(uuids, params?: any): Observable<any> {
     let parameters = [];
     if (params && params?.v) {
@@ -188,32 +205,32 @@ export class LocationService {
     if (parameters?.v) {
       othersParameters += `&v=${parameters?.v}`;
     }
-    return this.httpClient
-      .get(
-        "location?tag=" +
-          tagName +
-          (othersParameters != "" ? othersParameters : "&v=full&limit=100")
-      )
-      .pipe(
-        map((response) => {
-          return (
-            response?.results?.filter((res: any) => !res?.retired) || []
-          ).map((result) => {
-            return {
-              ...result,
-              childLocations:
-                result?.childLocations?.filter(
-                  (childLoc: any) => !childLoc?.retired
-                ) || [],
-              attributes:
-                result?.attributes && result?.attributes?.length > 0
-                  ? result?.attributes.filter((attribute) => !attribute?.voided)
-                  : [],
-            };
-          });
-        }),
-        catchError((error) => of(error))
-      );
+    const path =
+      "location?tag=" +
+      tagName +
+      (othersParameters != "" ? othersParameters : "&v=full&limit=100");
+    return this.httpClient.get(path).pipe(
+      map((response) => {
+        return (
+          response?.results?.filter((res: any) => !res?.retired) || []
+        ).map((result) => {
+          return {
+            ...result,
+            childLocations:
+              result?.childLocations?.filter(
+                (childLoc: any) => !childLoc?.retired
+              ) || [],
+            attributes:
+              result?.attributes && result?.attributes?.length > 0
+                ? result?.attributes.filter((attribute) => !attribute?.voided)
+                : [],
+          };
+        });
+      }),
+      catchError((error) => {
+        return of(error);
+      })
+    );
   }
 
   getLocationsByTagNames(
@@ -312,5 +329,24 @@ export class LocationService {
       }),
       catchError((error) => of(error))
     );
+  }
+
+  getLocationByAttributeTypeAndValue(parameters: any): Observable<any> {
+    return this.httpClient
+      .get(
+        `icare/location?attributeType=${parameters?.attributeType}&value=${parameters?.attributeValue}`
+      )
+      .pipe(
+        map((response) => {
+          return response?.results && response?.results?.length > 0
+            ? response?.results[0]
+            : {
+                error: {
+                  message: "Code does not found",
+                },
+              };
+        }),
+        catchError((error) => of(error))
+      );
   }
 }

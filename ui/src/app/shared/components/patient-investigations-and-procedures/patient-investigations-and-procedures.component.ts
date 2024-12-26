@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, OnInit, Output } from "@angular/core";
-import { FormControl } from "@angular/forms";
+import { UntypedFormControl } from "@angular/forms";
 import { Visit } from "../../resources/visits/models/visit.model";
 
 @Component({
@@ -19,19 +19,20 @@ export class PatientInvestigationsAndProceduresComponent implements OnInit {
   @Input() userPrivileges: any;
   @Input() fromConsultation: boolean;
   @Input() isInpatient: boolean;
-  @Input() tabToShow: boolean;
+  @Input() tabToShow: string;
   @Input() isTheatre: boolean;
-  selectedTab = new FormControl(0);
+  selectedTab = new UntypedFormControl(0);
 
   shouldShowLabSection: boolean = false;
   @Output() updateConsultationOrder = new EventEmitter();
   constructor() {}
 
   ngOnInit(): void {
+    this.tabToShow = this.tabToShow?.toLowerCase();
     this.shouldShowLabSection = !this.clinicConfigurations?.provisionalDiagnosis
-      ?.shouldAffectImmediateSections
+      ?.immedicateSectionsAffected
       ? (
-          this.clinicConfigurations?.provisionalDiagnosis?.immdicateSectionsAffected.filter(
+          this.clinicConfigurations?.provisionalDiagnosis?.immedicateSectionsAffected.filter(
             (section) => section?.laboratory
           ) || []
         ).length > 0

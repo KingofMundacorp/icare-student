@@ -1,5 +1,5 @@
 import { Payment } from "src/app/modules/billing/models/payment.model";
-import { keys, sumBy, sum } from "lodash";
+import { keys, sumBy, sum, groupBy } from "lodash";
 import { Component, OnInit } from "@angular/core";
 import { ActivatedRoute } from "@angular/router";
 
@@ -35,11 +35,42 @@ import { getIsPatientSentForExemption } from "src/app/store/selectors/visit.sele
 import { go, loadCurrentPatient } from "src/app/store/actions";
 import { MatDialog } from "@angular/material/dialog";
 import { ExemptionConfirmationComponent } from "../../components/exemption-confirmation/exemption-confirmation.component";
+import { formatDateToString } from "src/app/shared/helpers/format-date.helper";
+import { GoogleAnalyticsService } from "src/app/google-analytics.service";
+import { animate, state, style, transition, trigger } from "@angular/animations";
+
+
+interface Payments {
+  position: number;
+  receivedBy: string;
+  creator: string;
+  paymentType: string;
+  referenceNumber: string;
+  status: string;
+  createdAt: string;
+  receiptNumber: string;
+  billAmount: number;
+  paidAmount: number;
+  gepgpaymentDate: string;
+  payerNumber: string;
+  payerName: string;
+  pspName: string;
+  accountNumber: string;
+}
+
+
 
 @Component({
   selector: "app-current-patient-billing",
   templateUrl: "./current-patient-billing.component.html",
   styleUrls: ["./current-patient-billing.component.scss"],
+  animations: [
+    trigger('detailExpand', [
+      state('collapsed', style({height: '0px', minHeight: '0'})),
+      state('expanded', style({height: '*'})),
+      transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')),
+    ]),
+  ],
 })
 export class CurrentPatientBillingComponent implements OnInit {
   loading: boolean;
@@ -71,6 +102,17 @@ export class CurrentPatientBillingComponent implements OnInit {
   hasOpenExemptionRequest: boolean;
   isBillCleared: boolean;
   errors: any[] = [];
+  displayedColumns: string[] = ['position','createdAt', 'receivedBy', 'creator', 'paymentType', 'referenceNumber', 'status','print'];
+  dataSource: Payments[] = [];
+  color: string = '';
+  expandedElement: Payments | null;
+  onRowClick(row: any): void {
+    // Only expand if paymentType is 'Gepg'
+    if (row.paymentType === 'Gepg') {
+      this.expandedElement = this.expandedElement === row ? null : row;
+    }
+  }
+
 
   constructor(
     private route: ActivatedRoute,
@@ -83,13 +125,13 @@ export class CurrentPatientBillingComponent implements OnInit {
     private ordersService: OrdersService,
     private systemSettingsService: SystemSettingsService,
     private store: Store<AppState>,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private googleAnalyticsService: GoogleAnalyticsService
   ) {}
 
   ngOnInit() {
     this.patientId = this.route?.snapshot?.params?.patientId;
     this._getPatientDetails();
-
     this.currentPatient$ = this.patientService.getPatient(this.patientId);
     this.store.dispatch(
       loadCurrentPatient({ uuid: this.patientId, isRegistrationPage: false })
@@ -97,13 +139,14 @@ export class CurrentPatientBillingComponent implements OnInit {
     this.currentUser$ = this.store.select(getCurrentUserDetails);
     this.facilityLogo$ = this.configService.getLogo();
     this.facilityDetails$ = this.store.select(getParentLocation);
-    this.currentLocation$ = this.store.pipe(select(getCurrentLocation));
+    this.currentLocation$ = this.store.pipe(select(getCurrentLocation(false)));
     this.provider$ = this.store.select(getProviderDetails);
 
     this.billingService
       .getAllPatientInvoices(this.patientId, false, "all")
       .subscribe({
         next: (bills) => {
+          // console.log("The bills are", bills);
           bills.forEach((bill) => {
             if (bill) {
               this.bill = bill;
@@ -237,8 +280,39 @@ export class CurrentPatientBillingComponent implements OnInit {
           }
         })
       );
+      this.patientBillingDetails$
+      .pipe(
+        map((data: any) => data.payments.map((payment: any, index: number) => ({
+          position: index + 1,
+          receivedBy: payment.paymentDetails.receivedBy,
+          creator: payment.paymentDetails.creator.display,
+          paymentType: payment.paymentDetails.paymentType.name,
+          referenceNumber: payment.paymentDetails.referenceNumber,
+          status: payment.status,
+          createdAt: new Date(payment.created).toLocaleDateString(),
+          receiptNumber: payment.paymentDetails.receiptNumber,
+          billAmount: payment.paymentDetails.billAmount,
+          paidAmount: payment.paymentDetails.paidAmount,
+          gepgpaymentDate: new Date(payment.paymentDetails.paymentDate).toLocaleDateString(),
+          payerNumber: payment.paymentDetails.payerNumber,
+          payerName: payment.paymentDetails.payerName,
+          pspName: payment.paymentDetails.pspName,
+          accountNumber: payment.paymentDetails.accountNumber,
+
+        })))
+      )
+      .subscribe((payments: Payments[]) => {
+        this.dataSource = payments;
+      });
+    
   }
 
+
+  printElement(element: any) {
+    console.log('Printing:', element);
+  }
+
+  
   private _getPatientDetails() {
     this.loading = true;
 
@@ -259,7 +333,9 @@ export class CurrentPatientBillingComponent implements OnInit {
               return bill;
             }
           }),
-          payments,
+          payments: payments,
+          paymentKeys: Object.keys(groupBy(payments, "visit")),
+          currentPayments: groupBy(payments, "visit")[visit?.uuid],
           paymentItemCount: payments
             .map((payment) => payment?.items?.length || 0)
             .reduce((sum, count) => sum + count, 0),
@@ -282,7 +358,10 @@ export class CurrentPatientBillingComponent implements OnInit {
   onPaymentSuccess() {
     this._getPatientDetails();
   }
-
+  trackActionForAnalytics(eventname: any) {
+    // Send data to Google Analytics
+    this.googleAnalyticsService.sendAnalytics(`Cashier`,`${eventname}: Print`,`Billing`)
+  }
   onCheckOpenExemptionRequest(orderTypeUuid: any): any {
     this.store
       .select(getIsPatientSentForExemption(orderTypeUuid))
@@ -348,9 +427,10 @@ export class CurrentPatientBillingComponent implements OnInit {
     });
   }
 
+
   onPrint(e: any): void {
     let contents: string;
-
+     
     const frame1: any = document.createElement("iframe");
     frame1.name = "frame3";
     frame1.style.position = "absolute";
@@ -436,8 +516,10 @@ export class CurrentPatientBillingComponent implements OnInit {
     // Change image from base64 then replace some text with empty string to get an image
 
     let image = "";
+    let header = "";
+    let subHeader = "";
 
-    e.FacilityDetails.attributes.map((attribute) => {
+    e.FacilityDetails?.attributes?.map((attribute) => {
       let attributeTypeName =
         attribute && attribute.attributeType
           ? attribute?.attributeType?.name.toLowerCase()
@@ -445,6 +527,8 @@ export class CurrentPatientBillingComponent implements OnInit {
       if (attributeTypeName === "logo") {
         image = attribute?.value;
       }
+      header = attributeTypeName === "header" ? attribute?.value : "";
+      subHeader = attributeTypeName === "sub header" ? attribute?.value : "";
     });
 
     let patientMRN =
@@ -457,14 +541,21 @@ export class CurrentPatientBillingComponent implements OnInit {
     frameDoc.document.write(`
     
       <center id="top">
+         <div class="info">
+          <h2>${header.length > 0 ? header : e.FacilityDetails.display} </h2>
+          </div>
         <div class="logo">
           <img src="${image}" alt="Facility's Logo"> 
         </div>
         
 
         <div class="info">
-          <h2>${e.FacilityDetails.display}</h2>
-          <h3>P.O Box ${e.FacilityDetails.postalCode} ${e.FacilityDetails.stateProvince}</h3>
+          <h2>${
+            subHeader.length > 0 ? subHeader : e.FacilityDetails.description
+          } </h2>
+          <h3>P.O Box ${e.FacilityDetails.postalCode} ${
+      e.FacilityDetails.stateProvince
+    }</h3>
           <h3>${e.FacilityDetails.country}</h3>
         </div>
         <!--End Info-->
@@ -504,15 +595,16 @@ export class CurrentPatientBillingComponent implements OnInit {
           payment.items.forEach((item) => {
             let paymentDate = new Date(payment.created);
             // Date to string
-            let date_paid = `${
-              paymentDate.getDate().toString().length > 1
-                ? paymentDate.getDate()
-                : "0" + paymentDate.getDate()
-            }-${
-              paymentDate.getMonth().toString().length > 1
-                ? paymentDate.getMonth() + 1
-                : "0" + paymentDate.getMonth() + 1
-            }-${paymentDate.getFullYear()}`;
+            let date_paid = formatDateToString(paymentDate);
+            // let date_paid = `${
+            //   paymentDate.getDate().toString().length > 1
+            //     ? paymentDate.getDate()
+            //     : "0" + paymentDate.getDate()
+            // }-${
+            //   paymentDate.getMonth().toString().length > 1
+            //     ? paymentDate.getMonth() + 1
+            //     : "0" + paymentDate.getMonth() + 1
+            // }-${paymentDate.getFullYear()}`;
             contents = `
                 <tr>
                   <td>${item.name}</td> 
@@ -559,18 +651,65 @@ export class CurrentPatientBillingComponent implements OnInit {
 
         e.Bill.forEach((bill) => {
           bill.items.forEach((record) => {
-            contents = `
-            <tr>
-              <td>${record.name}</td> 
-              <td>${record.quantity}</td> 
-              <td>${record.amount}</td>
-            </tr>`;
-            frameDoc.document.write(contents);
+            // payable items
+            if (!record?.discounted || record.payable > 0) {
+              contents = `
+              <tr>
+                <td>${record.name}</td> 
+                <td>${record.quantity}</td> 
+                <td>${record.payable}</td>
+              </tr>`;
+              frameDoc.document.write(contents);
+            }
           });
           contents = `<tr>
           
           <td  style ="font-weight:bold;"> &nbsp;Total </td>
           <td colspan="2" style ="font-weight:bold; text-align:center">${bill.totalPaymentAmount}</td>
+          </tr>`;
+          frameDoc.document.write(contents);
+        });
+
+        frameDoc.document.write(`
+          </tbody>
+        </table>`);
+      }
+    }
+
+    // For exempted items
+    if (e.Bill) {
+      if (e.Bill.length > 0) {
+        frameDoc.document.write(`
+        <div>
+          <h5>Exempted Items</h5>
+        </div>
+        <table id="table">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Quantity</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+        <tbody>`);
+
+        e.Bill.forEach((bill) => {
+          bill.items.forEach((record) => {
+            //Check for exempted items unexempted items
+            if (record.discounted) {
+              contents = `
+              <tr>
+                <td>${record.name}</td> 
+                <td>${record.quantity}</td> 
+                <td>${record.discount}</td>
+              </tr>`;
+              frameDoc.document.write(contents);
+            }
+          });
+          contents = `<tr>
+          
+          <td  style ="font-weight:bold;"> &nbsp;Total </td>
+          <td colspan="2" style ="font-weight:bold; text-align:center">${bill.discount}</td>
           </tr>`;
           frameDoc.document.write(contents);
         });
@@ -597,7 +736,7 @@ export class CurrentPatientBillingComponent implements OnInit {
     </html>`);
 
     frameDoc.document.close();
-
+    this.trackActionForAnalytics("BillingReceipt");
     setTimeout(function () {
       window.frames["frame3"].focus();
       window.frames["frame3"].print();

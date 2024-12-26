@@ -1,10 +1,11 @@
 import { Component, Inject, OnInit } from "@angular/core";
-import { FormControl } from "@angular/forms";
+import { UntypedFormControl } from "@angular/forms";
 import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog";
 import { Store } from "@ngrx/store";
 import { Observable } from "rxjs";
 import { map, tap } from "rxjs/operators";
 import { SystemSettingsService } from "src/app/core/services/system-settings.service";
+import { GoogleAnalyticsService } from "src/app/google-analytics.service";
 import { Patient } from "src/app/shared/resources/patient/models/patient.model";
 import { VisitsService } from "src/app/shared/resources/visits/services";
 import {
@@ -34,7 +35,7 @@ export class StartVisitModelComponent implements OnInit {
   loadingPatientByLocation: boolean = true;
   patient: any;
   patientPhone: any;
-  selectedTab = new FormControl(0);
+  selectedTab = new UntypedFormControl(0);
   omitCurrent: boolean = true;
   visitTypes$: Observable<any[]>;
   servicesConfigs$: Observable<any[]>;
@@ -52,8 +53,10 @@ export class StartVisitModelComponent implements OnInit {
     private visitService: VisitsService,
     private systemSettingsService: SystemSettingsService,
     private dialogRef: MatDialogRef<StartVisitModelComponent>,
+    private googleAnalyticsService: GoogleAnalyticsService,
     @Inject(MAT_DIALOG_DATA) data
   ) {
+    // console.log("patience details ------------------------------->",data?.patient);
     this.patient = data?.patient;
     this.patient?.person?.attributes?.map((attribute) => {
       if (
@@ -72,6 +75,7 @@ export class StartVisitModelComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // console.log("visitService data load console --------------------------------",this.visitService);
     this.treatmentLocations$ = this.store.select(getAllTreatmentLocations);
     this.visitTypes$ = this.visitService.getVisitsTypes();
     this.servicesConfigs$ =
@@ -107,6 +111,17 @@ export class StartVisitModelComponent implements OnInit {
     setTimeout(() => {
       this.store.dispatch(go({ path: [path] }));
     }, 200);
+    this.trackActionForAnalytics(`Edit Patient: View`)
+
+  }
+
+
+
+
+
+  trackActionForAnalytics(eventname: any) {
+    // Send data to Google Analytics
+   this.googleAnalyticsService.sendAnalytics('Registration',eventname,'Registration')
   }
 
   onStartVisit() {

@@ -1,17 +1,16 @@
 import { Component, EventEmitter, Input, OnInit, Output } from "@angular/core";
 import { Store } from "@ngrx/store";
 import { Observable } from "rxjs";
+import { map } from "rxjs/operators";
 import { getBillingConceptUuid } from "src/app/core";
 import { Location } from "src/app/core/models";
 import { VisitObject } from "src/app/shared/resources/visits/models/visit-object.model";
 import { VisitsService } from "src/app/shared/resources/visits/services";
-import { loadLocationById } from "src/app/store/actions";
 import { AppState } from "src/app/store/reducers";
 import { getBedsGroupedByTheCurrentLocationChildren } from "src/app/store/selectors";
-import {
-  getAllAdmittedPatientVisits,
-  getPatientVisitsForAdmissionAddedState,
-} from "src/app/store/selectors/visit.selectors";
+import { getPatientVisitsForAdmissionAddedState } from "src/app/store/selectors/visit.selectors";
+
+import { keyBy } from "lodash";
 
 @Component({
   selector: "app-wards-list",
@@ -31,9 +30,27 @@ export class WardsListComponent implements OnInit {
 
   constructor(
     private store: Store<AppState>,
-    private visitService: VisitsService
-  ) {}
+    private visitService: VisitsService,
+    
+  ) {
+    this.admittedPatientsVisits$ = this.getAdmittedPatientsVisits();
+    this.admissionVisitsAdded$ = this.getAdmissionVisitsAdded();
+  }
+  private getAdmittedPatientsVisits(): Observable<any> {
+    // Replace with real data fetching logic
+    return new Observable((observer) => {
+      observer.next({});
+      observer.complete();
+    });
+  }
 
+  private getAdmissionVisitsAdded(): Observable<any> {
+    // Replace with real data fetching logic
+    return new Observable((observer) => {
+      observer.next(false);
+      observer.complete();
+    });
+  }
   ngOnInit(): void {
     this.wardsInfo$ = this.store.select(
       getBedsGroupedByTheCurrentLocationChildren,
@@ -42,14 +59,18 @@ export class WardsListComponent implements OnInit {
       }
     );
 
-    this.admittedPatientsVisits$ =
-      this.visitService.getAdmittedPatientsVisitsByEncounterType(
-        this.encounterType
+    this.admittedPatientsVisits$ = this.visitService
+      .getPatientsVisitsByEncounterType(this.encounterType)
+      .pipe(
+        map((response: any) => {
+          return keyBy(response, "locationUuid");
+        })
       );
 
     this.admissionVisitsAdded$ = this.store.select(
       getPatientVisitsForAdmissionAddedState
     );
+    
   }
 
   onGetStatus(e, bed, visitData, bedOrdersWithBillStatus): void {

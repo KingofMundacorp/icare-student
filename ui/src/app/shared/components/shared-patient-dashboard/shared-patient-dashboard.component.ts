@@ -3,7 +3,6 @@ import { select, Store } from "@ngrx/store";
 import { Observable } from "rxjs";
 import { ICARE_CONFIG } from "src/app/shared/resources/config";
 import { DiagnosisObject } from "src/app/shared/resources/diagnosis/models/diagnosis-object.model";
-import { ObservationObject } from "src/app/shared/resources/observation/models/obsevation-object.model";
 import { Patient } from "src/app/shared/resources/patient/models/patient.model";
 import { VisitObject } from "src/app/shared/resources/visits/models/visit-object.model";
 import {
@@ -44,15 +43,10 @@ import {
   getLatestIPDRound,
   getVitalSignObservations,
 } from "src/app/store/selectors/observation.selectors";
-import {
-  getActiveVisit,
-  getActiveVisitDeathStatus,
-  getVisitLoadingState,
-} from "src/app/store/selectors/visit.selectors";
+import { getActiveVisitDeathStatus } from "src/app/store/selectors/visit.selectors";
 import { FormConfig } from "src/app/shared/modules/form/models/form-config.model";
 import { getLoadingPaymentStatus } from "src/app/store/selectors/payment.selector";
 
-import { getApplicableForms } from "../../helpers/identify-applicable-forms.helper";
 const CONSULTATION_FORM_CONFIGS: FormConfig[] = [
   { name: "All orderables", formLevel: 5 },
   { name: "Visit Diagnoses", formLevel: 2 },
@@ -82,7 +76,14 @@ import { UserService } from "src/app/modules/maintenance/services/users.service"
 import { ConceptsService } from "../../resources/concepts/services/concepts.service";
 import { VisitConsultationStatusModalComponent } from "../../dialogs/visit-consultation-status-modal/visit-consultation-status-modal.component";
 import { BillingService } from "src/app/modules/billing/services/billing.service";
-import { tap, map as rxMap } from "rxjs/operators";
+import { map, map as rxMap, switchMap } from "rxjs/operators";
+import { keyBy, orderBy } from "lodash";
+import { loadActiveVisit } from "src/app/store/actions/visit.actions";
+import { GoogleAnalyticsService } from "src/app/google-analytics.service";
+import { SharedRemotePatientHistoryModalComponent } from "../../dialogs/shared-remote-patient-history-modal/shared-remote-patient-history-modal.component";
+import { MatRadioChange } from "@angular/material/radio";
+import { LocationService } from "src/app/core/services";
+import { GlobalSettingService } from "../../resources/global-setting/services";
 
 @Component({
   selector: "app-shared-patient-dashboard",
@@ -101,6 +102,7 @@ export class SharedPatientDashboardComponent implements OnInit {
   @Input() isTheatre: boolean;
   @Input() visitEndingControlStatusesConceptUuid: string;
   @Input() observations: any;
+  @Input() moduleName: any;
   currentPatient$: Observable<Patient>;
   vitalSignObservations$: Observable<any>;
   loadingVisit$: Observable<boolean>;
@@ -148,11 +150,20 @@ export class SharedPatientDashboardComponent implements OnInit {
   errors: any[] = [];
   patientInvoice$: Observable<any>;
   @Input() IPDRoundConceptUuid: string;
-  showRoundDetails: boolean = true;
+  showHistoryDetails: boolean = true;
   currentRound: any;
   latestRound$: Observable<any>;
   updateMedication: boolean = true;
-  tabsToShow: string[] = ["laboratory", "procedure", "radiology"];
+  tabsToShow: string[] = ["LABORATORY", "PROCEDURE", "RADIOLOGY"];
+  currentFormDetails: any = {};
+  useSideBar: boolean = false;
+  clearingFormTime: number = 0.5;
+
+  selectedHistoryCategory: string = "local";
+
+  shouldAllowRemoteHistory$: Observable<any>;
+  dataExchangeLocations$: Observable<any>;
+  hfrCodeLocationAttribute$: Observable<any>;
   constructor(
     private store: Store<AppState>,
     private dialog: MatDialog,
@@ -161,7 +172,10 @@ export class SharedPatientDashboardComponent implements OnInit {
     private configService: ConfigsService,
     private userService: UserService,
     private conceptService: ConceptsService,
-    private billingService: BillingService
+    private billingService: BillingService,
+    private globalSettingService: GlobalSettingService,
+    private googleAnalyticsService: GoogleAnalyticsService,
+    private locationService: LocationService
   ) {
     this.store.dispatch(loadEncounterTypes());
   }
@@ -176,7 +190,6 @@ export class SharedPatientDashboardComponent implements OnInit {
           obs?.concept?.uuid === this.visitEndingControlStatusesConceptUuid
       ) || [])[0]?.valueObject;
     }
-
     this.onStartConsultation(this.activeVisit);
     this.store.dispatch(loadOrderTypes());
     this.orderTypes$ = this.store.select(getAllOrderTypes);
@@ -185,7 +198,6 @@ export class SharedPatientDashboardComponent implements OnInit {
         formUuids: this.currentLocation?.forms,
       })
     );
-
     this.privileges$ = this.store.select(getCurrentUserPrivileges);
     this.provider$ = this.store.select(getProviderDetails);
     this.store.dispatch(
@@ -236,11 +248,15 @@ export class SharedPatientDashboardComponent implements OnInit {
       select(getFormEntitiesByNames(CONSULTATION_FORM_CONFIGS))
     );
 
-    this.forms$ = this.store.select(
-      getCustomOpenMRSFormsByIds(this.currentLocation?.forms)
-    );
+    this.forms$ = this.store
+      .select(getCustomOpenMRSFormsByIds(this.currentLocation?.forms))
+      .pipe(
+        map((forms) => {
+          return orderBy(forms, ["name"], ["asc"]);
+        })
+      );
 
-    this.currentLocation$ = this.store.select(getCurrentLocation);
+    this.currentLocation$ = this.store.select(getCurrentLocation(false));
     this.consultationOrderType$ =
       this.systemSettingsService.getSystemSettingsByKey(
         "iCare.clinic.consultation.orderType"
@@ -265,6 +281,33 @@ export class SharedPatientDashboardComponent implements OnInit {
       this.systemSettingsService.getSystemSettingsByKey(
         "iCare.ipd.encounterType.observationChart"
       );
+
+    this.shouldAllowRemoteHistory$ =
+      this.systemSettingsService.getSystemSettingsByKey(
+        "iCare.interoperability.settings.allowRemoteHistory"
+      );
+
+    this.hfrCodeLocationAttribute$ =
+      this.systemSettingsService.getSystemSettingsByKey(
+        "icare.location.attributes.hfrCode.attributeUuid"
+      );
+
+    this.dataExchangeLocations$ = this.systemSettingsService
+      .getSystemSettingsByKey(
+        "iCare.interoperability.settings.exchangeLocationsTag"
+      )
+      .pipe(
+        switchMap((response: any) => {
+          return response != "none"
+            ? this.locationService.getLocationsByTagName(response).pipe(
+                map((locationsResponse: any) => {
+                  return locationsResponse;
+                })
+              )
+            : "";
+        })
+      );
+
     this.facilityDetails$ = this.configService.getFacilityDetails();
     this.facilityDetails$ = this.userService.getLoginLocations();
 
@@ -318,21 +361,41 @@ export class SharedPatientDashboardComponent implements OnInit {
           return res;
         })
       );
-    this.showRoundDetails = this.activeVisit?.isAdmitted;
+    this.showHistoryDetails = this.activeVisit?.isAdmitted;
+  }
+
+  toggleSideBarMenu(event: Event): void {
+    event.stopPropagation();
+    this.useSideBar = !this.useSideBar;
+  }
+  async loadGlobalProperty() {
+    try {
+      const globalProperty = await this.globalSettingService.getSpecificGlobalProperties("ed9dac4a-5b2a-4a5f-8ee2-ca0d88b08506").toPromise();
+      const minutes = parseInt(globalProperty?.value ?? "0", 10);
+      this.clearingFormTime = isNaN(minutes / 60) ? 0.5 : minutes / 60;
+      console.log("time received :",this.clearingFormTime);
+    } catch (error) {
+      console.error("Error occurred:", error);
+      this.clearingFormTime = 0.5; 
+    }
   }
 
   onToggleVitalsSummary(event: Event): void {
+    console.log(event);
     event.stopPropagation();
+    this.trackActionForAnalytics(`View Vitals: Open`);
     this.showVitalsSummary = !this.showVitalsSummary;
   }
 
   getSelectedForm(event: Event, form: any): void {
+    this.trackActionForAnalytics(`${form?.name}: Open`);
+    this.loadGlobalProperty();
     this.readyForClinicalNotes = false;
     if (event) {
       event.stopPropagation();
     }
     this.selectedForm = form;
-    this.showRoundDetails = false;
+    this.showHistoryDetails = false;
     setTimeout(() => {
       this.readyForClinicalNotes = true;
     }, 50);
@@ -349,8 +412,9 @@ export class SharedPatientDashboardComponent implements OnInit {
   }
 
   onToggleVisibityIcons(event: Event): void {
+    this.trackActionForAnalytics(`View History: Open`);
     event.stopPropagation();
-    this.showRoundDetails = !this.showRoundDetails;
+    this.showHistoryDetails = !this.showHistoryDetails;
   }
 
   onGetLatestRound(round: any): void {
@@ -380,6 +444,11 @@ export class SharedPatientDashboardComponent implements OnInit {
     });
   }
 
+  trackActionForAnalytics(eventname: any) {
+    // Send data to Google Analytics
+    this.googleAnalyticsService.sendAnalytics("Clinic", eventname, "Clinic");
+  }
+
   onOpenPopup(
     event: Event,
     formUuid,
@@ -393,8 +462,10 @@ export class SharedPatientDashboardComponent implements OnInit {
     observations,
     generalPrescriptionOrderType,
     useGeneralPrescription,
-    showPrintButton: boolean
+    showPrintButton: boolean,
+    actionType: string
   ): void {
+    this.trackActionForAnalytics(`Refer: Open`);
     event.stopPropagation();
     this.showPrintButton = showPrintButton;
     this.systemSettingsService
@@ -427,6 +498,16 @@ export class SharedPatientDashboardComponent implements OnInit {
       });
   }
 
+  onGetCurrentFormDetails(selectedFormDetails: any): void {
+    this.currentFormDetails = {
+      ...selectedFormDetails,
+      ...(selectedFormDetails?.configs &&
+      selectedFormDetails?.configs?.dependants
+        ? keyBy(selectedFormDetails?.configs?.dependants, "uuid")
+        : {}),
+    };
+  }
+
   onOpenAdmitPopup(
     event: Event,
     formUuid,
@@ -450,6 +531,7 @@ export class SharedPatientDashboardComponent implements OnInit {
       disableClose: false,
       panelClass: "custom-dialog-container",
     });
+    this.trackActionForAnalytics(`Admit: Open`);
   }
 
   onOpenTransferWithinPopup(
@@ -480,6 +562,7 @@ export class SharedPatientDashboardComponent implements OnInit {
       disableClose: false,
       panelClass: "custom-dialog-container",
     });
+    this.trackActionForAnalytics(`Transfer WithIn: Open`);
   }
 
   onUpdateConsultationOrder() {
@@ -514,6 +597,7 @@ export class SharedPatientDashboardComponent implements OnInit {
   }
 
   onDischargePatient(event: Event, invoice?: any): void {
+    this.trackActionForAnalytics(`View Discharge: Open`);
     event.stopPropagation();
     this.dichargePatient.emit({ discharge: true, invoice: invoice });
   }
@@ -527,7 +611,6 @@ export class SharedPatientDashboardComponent implements OnInit {
     visit,
     patient
   ): void {
-    console.log(patient);
     event.stopPropagation();
     this.dialog.open(VisitConsultationStatusModalComponent, {
       width: "25%",
@@ -540,9 +623,31 @@ export class SharedPatientDashboardComponent implements OnInit {
         location,
       },
     });
+
+    this.trackActionForAnalytics(`End Consultation: Open`);
+  }
+  reload(currentPatient: Patient) {
+    this.store.dispatch(loadActiveVisit({ patientId: currentPatient?.id }));
   }
 
-  reload(){
-    this.ngOnInit();
+  onOpenClientHistoryFromRemote(
+    event,
+    currentPatient,
+    activeVisit,
+    provider
+  ): void {
+    event.stopPropagation();
+    this.dialog.open(SharedRemotePatientHistoryModalComponent, {
+      minWidth: "40%",
+      data: {
+        currentPatient,
+        activeVisit,
+        provider,
+      },
+    });
+  }
+
+  onToggleHistoryType(event: MatRadioChange): void {
+    this.selectedHistoryCategory = event?.value;
   }
 }

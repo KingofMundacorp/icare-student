@@ -11,14 +11,13 @@ import { BrowserModule } from "@angular/platform-browser";
 import { BrowserAnimationsModule } from "@angular/platform-browser/animations";
 import { EffectsModule } from "@ngrx/effects";
 import {
-  DefaultRouterStateSerializer,
+  MinimalRouterStateSerializer,
   RouterStateSerializer,
   StoreRouterConnectingModule,
 } from "@ngrx/router-store";
 import { StoreModule } from "@ngrx/store";
 import { StoreDevtoolsModule } from "@ngrx/store-devtools";
 import { environment } from "src/environments/environment";
-import { SharedModule } from "../shared/shared.module";
 import { effects } from "../store/effects";
 import { reducers, metaReducers } from "../store/reducers";
 import { AppRoutingModule } from "./app-routing.module";
@@ -30,30 +29,42 @@ import {
   IndexDbServiceConfig,
 } from "./services/index-db.service";
 import { RouteSerializer } from "./utils";
+import { materialModules } from "../shared/material-modules";
+import { MenuComponent } from "./components/menu/menu.component";
+import { CommonModule } from "@angular/common";
+import { ModulesSelectorComponent } from "./components/modules-selector/modules-selector.component";
+import { UserAbbreviationComponent } from "./components/user-abbreviation/user-abbreviation.component";
 
 export function initializeDb(indexDbServiceConfig: IndexDbServiceConfig) {
   return () => new IndexDbService(indexDbServiceConfig);
 }
 
 @NgModule({
-  imports: [
-    BrowserModule,
-    FormsModule,
-    BrowserAnimationsModule,
-    AppRoutingModule,
-    HttpClientModule,
-    StoreModule.forRoot(reducers, { metaReducers }),
-    EffectsModule.forRoot(effects),
-    SharedModule,
-    StoreRouterConnectingModule.forRoot({
-      serializer: DefaultRouterStateSerializer,
-    }),
-    !environment.production ? StoreDevtoolsModule.instrument() : [],
-  ],
-  declarations: [...coreContainers, ...coreComponents, ...coreDialogs],
-  entryComponents: [...coreDialogs],
-  providers: [{ provide: RouterStateSerializer, useClass: RouteSerializer }],
-  exports: [BrowserModule, AppRoutingModule, BrowserAnimationsModule],
+    imports: [
+        CommonModule,
+        BrowserModule,
+        FormsModule,
+        BrowserAnimationsModule,
+        AppRoutingModule,
+        HttpClientModule,
+        ...materialModules,
+        StoreModule.forRoot(reducers, { metaReducers }),
+        EffectsModule.forRoot(effects),
+        StoreRouterConnectingModule.forRoot({
+            serializer: MinimalRouterStateSerializer,
+        }),
+        !environment.production ? StoreDevtoolsModule.instrument() : [],
+    ],
+    declarations: [
+        ...coreContainers,
+        ...coreComponents,
+        ...coreDialogs,
+        MenuComponent,
+        ModulesSelectorComponent,
+        UserAbbreviationComponent,
+    ],
+    providers: [{ provide: RouterStateSerializer, useClass: RouteSerializer }],
+    exports: [BrowserModule, AppRoutingModule, BrowserAnimationsModule]
 })
 export class CoreModule {
   /* make sure CoreModule is imported only by one NgModule the AppModule */

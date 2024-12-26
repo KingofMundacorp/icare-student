@@ -35,6 +35,8 @@ public class ICareConfig {
 	
 	public static final String BED_ORDER_TYPE = "icare.orderType.bed";
 	
+	public static final String CABINET_ORDER_TYPE = "icare.orderType.cabinet";
+	
 	public final static String REGISTRATION_FEE_CONCEPT = "icare.registration.feeConcept";
 	
 	public final static String INSURANCE_ATTRIBUTE = "icare.billing.insuranceAttribute";
@@ -93,6 +95,91 @@ public class ICareConfig {
 	
 	public static final String BED_ORDER_CONCEPT = "icare.billing.accomodationChargesConcept";
 	
+	public static final String CABINET_ORDER_CONCEPT = "icare.billing.cabinetChargesConcept";
+	
 	public static final String LAB_RESULT_APPROVAL_CONFIGURATION = "iCare.laboratory.resultApprovalConfiguration";
 	
+	public static final String ITEM_EXPIRATION_NOTIFICATION_IN_DAYS = "iCare.store.item.expiration.nofication";
+	
+	public static final String LAB_RESULTS_SUBJECT_CONFIGURATION_HTML = "mail.icare.laboratory.results.subject.html";
+	
+	public static final String LAB_RESULTS_BODY_ATTACHMENT_CONFIGURATION_HTML = "mail.icare.laboratory.results.body.attachment.html";
+	
+	public static final String LAB_RESULTS_BODY_SUMMARY_CONFIGURATION_HTML = "mail.icare.laboratory.results.body.summary.html";
+	
+	public static final String LAB_RESULTS_BODY_FOOTER_CONFIGURATION_HTML = "mail.icare.laboratory.results.body.footer.html";
+	
+	public static final String LAB_RESULTS_SHOULD_SEND_EMAIL_FOR_AUTHORIZED_RESULTS = "mail.icare.laboratory.results.authorized.autorelease";
+	
+	public static final String ICARE_PERSON_EMAIL_ATTRIBUTE_TYPE = "icare.email.person.attributeTypeUuid";
+	
+	public static final String ICARE_VISIT_EMAIL_ATTRIBUTE_TYPE = "icare.email.visit.referringDoctor.attributeTypeUuid";
+	
+	public static final String LAB_RELATED_METADATA_ATTRIBUTE_TYPE = "icare.laboratory.concept.relatedMetadata.attributeUuid";
+	
+	public static final String LAB_UNIFIED_CODING_REFERENCE_CONCEPT_SOURCE = "icare.laboratory.concept.unifiedCodingReference.conceptSourceUuid";
+	
+	public static final String LAB_INSTRUMENT_CLASS_UUID = "lis.icare.laboratory.instrument.conceptClassUuid";
+	
+	public static final String DRUG_FREQUENCY_EQUIVALENCE_CONCEPT_SOURCE = "icare.drugs.configuration.drugFrequencyEquivalence.conceptSourceUuid";
+	
+	public static final String DRUG_DURATION_UNITS_EQUIVALENCE_CONCEPT_SOURCE = "icare.drugs.configuration.drugDurationEquivalence.conceptSourceUuid";
+	
+	public static final String PASSWORD_EXPIRATION_TIME_IN_DAYS = "icare.user.password.expiration.time";
+	
+	public static final String SURVEILLANCE_CAPTURE_DIAGNOSIS_DATA = "iCare.interoperability.settings.surveillance.captureDiagnosisData";
+	
+	public static final String SURVEILLANCE_DIAGNOSES_CODES_REFERENCE = "iCare.interoperability.settings.surveillance.immediate.icdCodedDiagnoses";
+	
+	public static final String SURVEILLANCE_EVENT_PROGRAM = "iCare.interoperability.settings.surveillance.dhis2.eventProgram.uuid";
+	
+	public static final String SURVEILLANCE_SINGLE_EVENT_PROGRAM_STAGE = "iCare.interoperability.settings.surveillance.dhis2.eventProgramStage.uuid";
+	
+	public static final String SURVEILLANCE_SINGLE_EVENT_PROGRAM_MAPPINGS = "iCare.interoperability.settings.surveillance.dhis2.eventProgramMappings";
+	
+	public static final String INTEROPERABILITY_MEDIATORS_LIST = "iCare.interoperability.settings.mediators.list";
+	
+	public static final String HDU_API_WORKFLOW_UUID_FOR_OPD = "iCare.interoperability.settings.hduapi.workflowUuid.uuid";
+	
+	// public static final String SURVEILLANCE_SINGLE_EVENT_PROGRAM_MAPPINGS = "iCare.surveillance.settings.eventProgramMappings";
+	
+	public static final String GEPG_AUTH_SIGNATURE = "iCare.GePG.settings.authentication.authSignature";
+	
+	public static final String GFSCODE_CONCEPT_SOURCE_REFERENCE = "icare.billing.mappings.GFSCODEConceptSource.uuid";
+	
+	public static final String GEPG_UCC_BASE_URL_API = "icare.GePG.setting.baseurlApi";
+	
+	public static final String ENGINE_PUBLIC_KEY = "iCare.GePG.settings.enginePublicKey";
+	
+	public static final String CLIENT_PRIVATE_KEY = "iCare.GePG.settings.clientPrivateKey";
+	
+	public static final String GEPG_SYSTEM_CODE = "iCare.GePG.settings.systemCode";
+	
+	public static final String SP_CODE = "iCare.GePG.settings.ServiceProviderCode";
+	
+	public static final String SERVICE_CODE = "iCare.GePG.settings.ServiceCode";
+	
+	public static final String SERVICE_PROVIDER_ID = "iCare.GePG.settings.ServiceProviderID";
+	
+	public static final String SUB_SERVICE_PROVIDER_CODE = "iCare.GePG.settings.SubServiceProviderCode";
+	
+	public static final String ORDER_TO_SKIP_BILLING_ADVISOR = "iCare.billing.orderTypes.skipBillingOrderAdvisor";
+	
+	public static final String MACHINE_INTEGRATION_PRIMARY_CONCEPT_SOURCE = "icare.laboratory.concept.mappings.machineIntegration.conceptSourceUuid";
+	
+	public static final String PKCS12_PATH = "iCare.GePG.settings.pkcs12Path";
+	
+	public static final String PKCS12_PASSWORD = "iCare.GePG.settings.pkcs12Password";
+	
+	public static final String GEPG_USERNAME = "iCare.GePG.settings.GepgUsername";
+	
+	public static final String GEPG_PASSWORD = "iCare.GePG.settings.GepgPassword";
+	
+	public static final String DEFAULT_PAYMENT_TYPE_VIA_CONTROL_NUMBER = "icare.billing.controlNumberBasedPaymentType.concept.uuid";
+	
+	public static final String ALLOW_REMOTE_HISTORY = "iCare.interoperability.settings.allowRemoteHistory";
+	
+	public static final String DATA_EXCHANGE_LOCATION_TAG = "iCare.interoperability.settings.exchangeLocationsTag";
+	
+	public static final String HFRCODE_LOCATION_ATTRIBUTE_TYPE_UUID = "icare.location.attributes.hfrCode.attributeUuid";
 }

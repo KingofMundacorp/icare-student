@@ -1,5 +1,5 @@
 import { Component, OnInit } from "@angular/core";
-import { FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { Store } from "@ngrx/store";
 import { Observable } from "rxjs";
@@ -25,7 +25,7 @@ import { LoginHelpComponent } from "../../components/login-help/login-help.compo
   styleUrls: ["./login.component.scss"],
 })
 export class LoginComponent implements OnInit {
-  loginForm: FormGroup;
+  loginForm: UntypedFormGroup;
   authenticationLoading$: Observable<boolean>;
   loginErrorStatus$: Observable<boolean>;
   parentLocation$: Observable<Location>;
@@ -33,7 +33,7 @@ export class LoginComponent implements OnInit {
   logo: any;
   constructor(
     private store: Store<AppState>,
-    private formBuilder: FormBuilder,
+    private formBuilder: UntypedFormBuilder,
     public dialog: MatDialog
   ) {
     this.store.dispatch(loadLoginLocations());
@@ -44,9 +44,14 @@ export class LoginComponent implements OnInit {
       username: ["", Validators.required],
       password: ["", Validators.required],
     });
-    this.parentLocation$ = this.store.select(getParentLocation).pipe(tap((data) => {
-      this.logo = data?.attributes?.filter((attribute) => attribute?.attributeType?.display?.toLowerCase() === 'logo')[0]?.value
-    }));
+    this.parentLocation$ = this.store.select(getParentLocation).pipe(
+      tap((data) => {
+        this.logo = data?.attributes?.filter(
+          (attribute) =>
+            attribute?.attributeType?.display?.toLowerCase() === "logo"
+        )[0]?.value;
+      })
+    );
     this.authenticationLoading$ = this.store.select(
       getAuthenticationLoadingState
     );

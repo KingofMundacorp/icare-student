@@ -1,13 +1,14 @@
-import { Component, Inject, OnInit } from '@angular/core';
-import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { Store } from '@ngrx/store';
-import { random } from 'lodash';
-import { Observable } from 'rxjs';
-import { FormValue } from 'src/app/shared/modules/form/models/form-value.model';
-import { ConceptsService } from 'src/app/shared/resources/concepts/services/concepts.service';
-import { AppState } from 'src/app/store/reducers';
-import { getCurrentUserDetails } from 'src/app/store/selectors/current-user.selectors';
-import { BillingService } from '../../services/billing.service';
+import { Component, Inject, OnInit } from "@angular/core";
+import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog";
+import { Store } from "@ngrx/store";
+import { random } from "lodash";
+import { Observable } from "rxjs";
+import { FormValue } from "src/app/shared/modules/form/models/form-value.model";
+import { ConceptsService } from "src/app/shared/resources/concepts/services/concepts.service";
+import { AppState } from "src/app/store/reducers";
+import { getCurrentUserDetails } from "src/app/store/selectors/current-user.selectors";
+import { BillingService } from "../../services/billing.service";
+import { Payment } from "../../models/payment.model";
 
 @Component({
   selector: "app-bill-confirmation",
@@ -15,7 +16,8 @@ import { BillingService } from '../../services/billing.service';
   styleUrls: ["./bill-confirmation.component.scss"],
 })
 export class BillConfirmationComponent implements OnInit {
-  controlNumber?: number;
+  controlNumber?: string;
+  // controlNumber?: number;
   generatingControlNumber: boolean;
   savingPayment: boolean;
   savingPaymentError: string;
@@ -47,6 +49,26 @@ export class BillConfirmationComponent implements OnInit {
         ? this.data?.logo?.results[0]?.value
         : null;
 
+    const gepgrequestpayload = {
+      selectedbills: this.data.billItems.map((item: any) => ({ bill: item.bill })),
+      uuid: this.data.currentPatient.patient.uuid,
+      totalBill: this.data.totalPayableBill
+    };
+    
+    
+    // Construct the request payload
+  const requestPayload = this.data.billItems.map((item: any) => ({
+    uuid: item.bill, 
+    currency: "TZS" 
+  }));
+
+  console.log("Request Payload:", JSON.stringify(requestPayload, null, 2));
+
+  
+    console.log("Formatted payload:", requestPayload);
+    //Calling Controll number Generation Function
+    this.generatingControlNumber = true;
+    this.onConntrollNumbGen(requestPayload);
     this.currentUser = this.store.select(getCurrentUserDetails).subscribe({
       next: (currentUser) => {
         return currentUser;
@@ -57,12 +79,44 @@ export class BillConfirmationComponent implements OnInit {
       },
     });
   }
+   
+ 
 
+  onConntrollNumbGen(payload: any) {
+    this.generatingControlNumber = true;  
+    this.billingService.gepgpayBill(payload).subscribe(
+      (response: any) => {
+        if (response && response.controlNumber) {
+          this.controlNumber = response.controlNumber;
+          console.log("Successfully generated control number:", this.controlNumber);
+        } else if (response.error) {
+          this.savingPaymentError = response.error;
+          console.log("Error in response:", response.error);
+        } else {
+          this.savingPaymentError = 'Server Error Please Contact an Admin !';
+          console.log("Unexpected response:", response);
+        }
+        this.generatingControlNumber = false; 
+        // this.matDialogRef.close(response);
+      },
+      (error) => {
+        this.savingPaymentError = error;
+        this.generatingControlNumber = false; 
+        console.log("Failed to generate control number:", error);
+      }
+    );
+  }
+  
+
+  
   get controlNumberValue(): string {
     return `GEPG_MNL: ${this.controlNumber}`;
   }
+  
+  
 
- onFormUpdate(formValues: FormValue): void {
+
+  onFormUpdate(formValues: FormValue): void {
     this.isFormValid = formValues.isValid;
     this.formValues = { ...this.formValues, ...formValues.getValues() };
 
@@ -70,13 +124,14 @@ export class BillConfirmationComponent implements OnInit {
     const correntCN = new RegExp("\\d{11,}").test(
       String(formValues.getValues()[this.data?.gepgConceptUuid]?.value)
     );
-    if(correntCN){
-      this.controlNumber =
-        Number(formValues.getValues()[this.data?.gepgConceptUuid]?.value);
+    if (correntCN) {
+      this.controlNumber = String(
+        formValues.getValues()[this.data?.gepgConceptUuid]?.value
+      );
     } else {
       this.controlNumber = undefined;
     }
- }
+  }
 
   onCancel(e): void {
     e.stopPropagation();
@@ -116,7 +171,7 @@ export class BillConfirmationComponent implements OnInit {
 
   onGepgConfirmation(e): void {
     e.stopPropagation();
-    this.savingPayment = true;
+    this.savingPayment = false;
     this.billingService
       .payBill(this.data?.bill, {
         confirmedItems: this.data?.billItems,
@@ -130,7 +185,7 @@ export class BillConfirmationComponent implements OnInit {
           this.matDialogRef.close(paymentResponse);
         },
         (error) => {
-          this.savingPayment = false;
+          this.savingPayment = true;
           this.savingPaymentError = error;
         }
       );
@@ -219,8 +274,10 @@ export class BillConfirmationComponent implements OnInit {
 
     // Change image from base64 then replace some text with empty string to get an image
     let image = "";
+    let header = "";
+    let subHeader = "";
 
-    this.facilityDetailsJson.attributes.map((attribute) => {
+    e.FacilityDetails?.attributes?.map((attribute) => {
       let attributeTypeName =
         attribute && attribute.attributeType
           ? attribute?.attributeType?.name.toLowerCase()
@@ -228,11 +285,13 @@ export class BillConfirmationComponent implements OnInit {
       if (attributeTypeName === "logo") {
         image = attribute?.value;
       }
+      header = attributeTypeName === "header" ? attribute?.value : "";
+      subHeader = attributeTypeName === "sub header" ? attribute?.value : "";
     });
 
     let patientMRN =
-      e?.CurrentPatient?.MRN ||
-      e?.CurrentPatient?.patient?.identifiers[0]?.identifier.replace(
+      e.CurrentPatient?.MRN ||
+      e.CurrentPatient?.patient?.identifiers[0]?.identifier.replace(
         "MRN = ",
         ""
       );
@@ -240,14 +299,21 @@ export class BillConfirmationComponent implements OnInit {
     frameDoc.document.write(`
     
       <center id="top">
+         <div class="info">
+          <h2>${header.length > 0 ? header : e.FacilityDetails.display} </h2>
+          </div>
         <div class="logo">
           <img src="${image}" alt="Facility's Logo"> 
         </div>
         
 
         <div class="info">
-          <h2>${e?.FacilityDetails?.display}</h2>
-          <h3>P.O Box ${e.FacilityDetails?.postalCode} ${e.FacilityDetails?.stateProvince}</h3>
+          <h2>${
+            subHeader.length > 0 ? subHeader : e.FacilityDetails.description
+          } </h2>
+          <h3>P.O Box ${e.FacilityDetails?.postalCode} ${
+      e.FacilityDetails?.stateProvince
+    }</h3>
           <h3>${e?.FacilityDetails?.country}</h3>
         </div>
         <!--End Info-->

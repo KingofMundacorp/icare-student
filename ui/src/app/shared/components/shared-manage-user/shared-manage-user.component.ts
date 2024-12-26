@@ -1,8 +1,16 @@
-import { Component, ElementRef, Input, OnInit, ViewChild } from "@angular/core";
 import {
-  FormBuilder,
-  FormControl,
-  FormGroup,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnInit,
+  Output,
+  ViewChild,
+} from "@angular/core";
+import {
+  UntypedFormBuilder,
+  UntypedFormControl,
+  UntypedFormGroup,
   Validators,
 } from "@angular/forms";
 import { MatSnackBar } from "@angular/material/snack-bar";
@@ -26,6 +34,7 @@ import { go } from "src/app/store/actions";
 import { MatSelectChange } from "@angular/material/select";
 import { UserService } from "src/app/modules/maintenance/services/users.service";
 import { GlobalEventHandlersEvent } from "src/app/modules/maintenance/models/user.model";
+import { PasswordRegExpressionReferences } from "src/app/core/constants/password-security.constants";
 
 @Component({
   selector: "app-shared-manage-user",
@@ -36,11 +45,13 @@ export class SharedManageUserComponent implements OnInit {
   @Input() user: any;
   @Input() systemModules: any;
   @Input() hideModuleSelection: boolean;
+  @Input() securitySystemSettings: any[];
+  @Output() cancel: EventEmitter<boolean> = new EventEmitter<boolean>();
 
   @ViewChild("table", { static: false }) table: MatTable<any>;
   @ViewChild("filter", { static: false }) filter: ElementRef;
   loading: boolean = true;
-  userForm: FormGroup;
+  userForm: UntypedFormGroup;
   hide: boolean = true;
   roles: RoleCreate[];
   selectedRoles: any[] = [];
@@ -86,9 +97,10 @@ export class SharedManageUserComponent implements OnInit {
 
   passwordIsRequired: boolean = true;
   selectedModules: any[] = [];
+  passwordStrengthMessage: string = "Password should match required settings";
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     private service: UserService,
     private _snackBar: MatSnackBar,
     private locationService: LocationService,
@@ -97,6 +109,7 @@ export class SharedManageUserComponent implements OnInit {
   ) {}
 
   ngOnInit() {
+    // console.log("securitySystemSettings", this.securitySystemSettings);
     if (this.user && this.user?.uuid) {
       this.selectedModules = this.user?.userProperties?.preferredModules
         ? this.systemModules?.filter(
@@ -235,53 +248,53 @@ export class SharedManageUserComponent implements OnInit {
   generateForm(user: any): any {
     this.selectedRoles = user?.roles;
     return this.fb.group({
-      username: new FormControl(user?.username, Validators.required),
+      username: new UntypedFormControl(user?.username, [Validators.required]),
       password: [
         "",
         !user ? [Validators.required, Validators.minLength(8)] : [],
       ],
-      gender: new FormControl(user?.person ? user?.person?.gender : null, [
+      gender: new UntypedFormControl(user?.person ? user?.person?.gender : null, [
         Validators?.required,
       ]),
-      middleName: new FormControl(
+      middleName: new UntypedFormControl(
         user?.person ? user?.person?.preferredName?.middleName : null
       ),
-      firstName: new FormControl(
+      firstName: new UntypedFormControl(
         user?.person ? user?.person?.preferredName?.givenName : null,
         Validators.required
       ),
-      surname: new FormControl(
+      surname: new UntypedFormControl(
         user?.person ? user?.person?.preferredName?.familyName : null,
         Validators.required
       ),
-      confirmpassword: new FormControl(""),
-      addressDisplay: new FormControl(
+      confirmpassword: new UntypedFormControl(""),
+      addressDisplay: new UntypedFormControl(
         user?.person ? user?.person?.preferredAddress?.address1 : null
       ),
-      country: new FormControl(
+      country: new UntypedFormControl(
         user?.person ? user?.person?.preferredAddress?.country : null,
         Validators.required
       ),
-      district: new FormControl(
+      district: new UntypedFormControl(
         user?.person ? user?.person?.preferredAddress?.countyDistrict : null,
         Validators.required
       ),
-      city: new FormControl(
+      city: new UntypedFormControl(
         user?.person ? user?.person?.preferredAddress?.stateProvince : null,
         Validators.required
       ),
-      postalCode: new FormControl(""),
-      addressDisplay2: new FormControl(
+      postalCode: new UntypedFormControl(""),
+      addressDisplay2: new UntypedFormControl(
         user?.person ? user?.person?.preferredAddress?.address1 : null
       ),
       checked: false,
-      birthdate: new FormControl(
+      birthdate: new UntypedFormControl(
         user?.person ? new Date(user?.person?.birthdate) : null,
         Validators.required
       ),
-      MCTNumber: new FormControl(user?.MCTNumber),
-      phoneNumber: new FormControl(user?.phoneNumber),
-      qualification: new FormControl(user?.qualification),
+      MCTNumber: new UntypedFormControl(user?.MCTNumber),
+      phoneNumber: new UntypedFormControl(user?.phoneNumber),
+      qualification: new UntypedFormControl(user?.qualification),
     });
   }
 
@@ -311,7 +324,7 @@ export class SharedManageUserComponent implements OnInit {
   }
 
   onGetSelectedLocationItems(selected) {
-    console.log(selected);
+    // console.log(selected);
   }
 
   onGetPreferredModule(event: MatSelectChange): void {
@@ -732,13 +745,64 @@ export class SharedManageUserComponent implements OnInit {
     this.passwordFocusOut = true;
     e.stopPropagation();
     if (this.passwordInput.value && this.passwordInput.value !== "") {
-      const strongPassword = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])\w{6,}$/;
+      const passwordMinLengthSetting = (this.securitySystemSettings?.filter(
+        (setting: any) => setting?.property === "security.passwordMinimumLength"
+      ) || [])[0];
+
+      const minLength = passwordMinLengthSetting?.value
+        ? Number(passwordMinLengthSetting?.value)
+        : 8;
+      const regExpressSetting = (this.securitySystemSettings?.filter(
+        (setting: any) => setting?.property === "security.passwordCustomRegex"
+      ) || [])[0];
+
+      const passwordRequiresUpperAndLowerCaseSetting =
+        (this.securitySystemSettings?.filter(
+          (setting: any) =>
+            setting?.property === "security.passwordRequiresUpperAndLowerCase"
+        ) || [])[0];
+
+      const passwordRequiresNonDigit = (this.securitySystemSettings?.filter(
+        (setting: any) =>
+          setting?.property === "security.passwordRequiresNonDigit"
+      ) || [])[0];
+      const checkLengthRegExp =
+        "\\" +
+        (passwordRequiresNonDigit && passwordRequiresNonDigit?.value === "true"
+          ? "w"
+          : "d") +
+        "{" +
+        minLength +
+        ",}";
+      // const check = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])\w{6,}$/;
+      const pattern =
+        regExpressSetting && regExpressSetting?.value
+          ? regExpressSetting?.value
+          : PasswordRegExpressionReferences.AT_LEAST_ONE_DIGIT +
+            (passwordRequiresNonDigit &&
+            passwordRequiresNonDigit?.value === "true"
+              ? passwordRequiresUpperAndLowerCaseSetting &&
+                passwordRequiresUpperAndLowerCaseSetting?.value === "true"
+                ? PasswordRegExpressionReferences.AT_LEAST_ONE_LOWER_CASE_CHAR +
+                  PasswordRegExpressionReferences.AT_LEAST_ONE_UPPER_CASE_CHAR
+                : ""
+              : "") +
+            checkLengthRegExp;
+      const strongPassword = new RegExp("^" + pattern + "$");
       const test = strongPassword.test(this.passwordInput.value);
       this.passwordFocusOut = true;
       if (test) {
         this.passwordStrong = true;
+        this.passwordStrengthMessage = "";
       } else {
         this.passwordStrong = false;
+        this.passwordStrengthMessage =
+          "Password should meet the following conditions" +
+          (regExpressSetting && regExpressSetting?.value
+            ? "Pattern: " + regExpressSetting?.value
+            : passwordMinLengthSetting?.value
+            ? "Minimum length should be " + passwordMinLengthSetting?.value
+            : "");
       }
     }
   }
@@ -749,7 +813,6 @@ export class SharedManageUserComponent implements OnInit {
 
   onCancel(event: Event): void {
     event.stopPropagation();
-    if (!this.hideModuleSelection)
-      this.store.dispatch(go({ path: ["/maintenance/users-management"] }));
+    this.cancel.emit(true);
   }
 }

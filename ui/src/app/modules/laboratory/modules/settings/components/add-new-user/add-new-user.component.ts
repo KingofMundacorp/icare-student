@@ -1,16 +1,24 @@
-import { Component, ElementRef, OnInit, ViewChild } from "@angular/core";
 import {
-  FormBuilder,
-  FormControl,
-  FormGroup,
+  Component,
+  ElementRef,
+  Inject,
+  Input,
+  OnInit,
+  ViewChild,
+} from "@angular/core";
+import {
+  UntypedFormBuilder,
+  UntypedFormControl,
+  UntypedFormGroup,
   Validators,
 } from "@angular/forms";
-import { MatDialogRef } from "@angular/material/dialog";
+import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBar } from "@angular/material/snack-bar";
 import { MatTable, MatTableDataSource } from "@angular/material/table";
 import { Router } from "@angular/router";
 import * as moment from "moment";
 import { Observable } from "rxjs";
+import { PasswordRegExpressionReferences } from "src/app/core/constants/password-security.constants";
 import { LocationService } from "src/app/core/services";
 import { SystemUsersService } from "src/app/core/services/system-users.service";
 import { processDateFromMaterialInput } from "src/app/shared/helpers/utils.helpers";
@@ -22,10 +30,11 @@ import { LocationGetFull, RoleCreate } from "src/app/shared/resources/openmrs";
   styleUrls: ["./add-new-user.component.scss"],
 })
 export class AddNewUserComponent implements OnInit {
+  securitySystemSettings: any[];
   @ViewChild("table", { static: false }) table: MatTable<any>;
   @ViewChild("filter", { static: false }) filter: ElementRef;
   loading: boolean = true;
-  userForm: FormGroup;
+  userForm: UntypedFormGroup;
   hide: boolean = true;
   roles: RoleCreate[];
   selectedRoles: any[] = [];
@@ -67,14 +76,19 @@ export class AddNewUserComponent implements OnInit {
   passwordStrong: Boolean = true;
   laboratoryLocations$: Observable<Location[]>;
   roles$: Observable<any[]>;
+
+  passwordStrengthMessage: string = "Password should match required settings";
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     private service: SystemUsersService,
     private router: Router,
     private _snackBar: MatSnackBar,
     private dialogRef: MatDialogRef<AddNewUserComponent>,
+    @Inject(MAT_DIALOG_DATA) data: any,
     private locationService: LocationService
-  ) {}
+  ) {
+    this.securitySystemSettings = data;
+  }
 
   ngOnInit() {
     this.laboratoryLocations$ =
@@ -94,24 +108,24 @@ export class AddNewUserComponent implements OnInit {
 
   generateForm() {
     return this.fb.group({
-      username: new FormControl("", Validators.required),
+      username: new UntypedFormControl("", Validators.required),
       password: ["", [Validators.required, Validators.minLength(8)]],
-      gender: new FormControl(""),
-      middleName: new FormControl(""),
-      firstName: new FormControl("", Validators.required),
-      surname: new FormControl("", Validators.required),
-      confirmpassword: new FormControl(""),
-      addressDisplay: new FormControl(""),
-      country: new FormControl("", Validators.required),
-      district: new FormControl("", Validators.required),
-      city: new FormControl("", Validators.required),
-      postalCode: new FormControl(""),
-      addressDisplay2: new FormControl(""),
+      gender: new UntypedFormControl(""),
+      middleName: new UntypedFormControl(""),
+      firstName: new UntypedFormControl("", Validators.required),
+      surname: new UntypedFormControl("", Validators.required),
+      confirmpassword: new UntypedFormControl(""),
+      addressDisplay: new UntypedFormControl(""),
+      country: new UntypedFormControl("", Validators.required),
+      district: new UntypedFormControl("", Validators.required),
+      city: new UntypedFormControl("", Validators.required),
+      postalCode: new UntypedFormControl(""),
+      addressDisplay2: new UntypedFormControl(""),
       checked: false,
-      birthdate: new FormControl("", Validators.required),
-      MCTNumber: new FormControl(""),
-      phoneNumber: new FormControl(""),
-      qualification: new FormControl(""),
+      birthdate: new UntypedFormControl("", Validators.required),
+      MCTNumber: new UntypedFormControl(""),
+      phoneNumber: new UntypedFormControl(""),
+      qualification: new UntypedFormControl(""),
     });
   }
 
@@ -496,13 +510,65 @@ export class AddNewUserComponent implements OnInit {
     this.passwordFocusOut = true;
     e.stopPropagation();
     if (this.passwordInput.value && this.passwordInput.value !== "") {
-      const strongPassword = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])\w{6,}$/;
+      // const strongPassword = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])\w{6,}$/;
+      const passwordMinLengthSetting = (this.securitySystemSettings?.filter(
+        (setting: any) => setting?.property === "security.passwordMinimumLength"
+      ) || [])[0];
+
+      const minLength = passwordMinLengthSetting?.value
+        ? Number(passwordMinLengthSetting?.value)
+        : 8;
+      const regExpressSetting = (this.securitySystemSettings?.filter(
+        (setting: any) => setting?.property === "security.passwordCustomRegex"
+      ) || [])[0];
+
+      const passwordRequiresUpperAndLowerCaseSetting =
+        (this.securitySystemSettings?.filter(
+          (setting: any) =>
+            setting?.property === "security.passwordRequiresUpperAndLowerCase"
+        ) || [])[0];
+
+      const passwordRequiresNonDigit = (this.securitySystemSettings?.filter(
+        (setting: any) =>
+          setting?.property === "security.passwordRequiresNonDigit"
+      ) || [])[0];
+
+      const checkLengthRegExp =
+        "\\" +
+        (passwordRequiresNonDigit && passwordRequiresNonDigit?.value === "true"
+          ? "w"
+          : "d") +
+        "{" +
+        minLength +
+        ",}";
+      const pattern =
+        regExpressSetting && regExpressSetting?.value
+          ? regExpressSetting?.value
+          : PasswordRegExpressionReferences.AT_LEAST_ONE_DIGIT +
+            (passwordRequiresNonDigit &&
+            passwordRequiresNonDigit?.value === "true"
+              ? passwordRequiresUpperAndLowerCaseSetting &&
+                passwordRequiresUpperAndLowerCaseSetting?.value === "true"
+                ? PasswordRegExpressionReferences.AT_LEAST_ONE_LOWER_CASE_CHAR +
+                  PasswordRegExpressionReferences.AT_LEAST_ONE_UPPER_CASE_CHAR
+                : ""
+              : "") +
+            checkLengthRegExp;
+      const strongPassword = new RegExp("^" + pattern + "$");
       const test = strongPassword.test(this.passwordInput.value);
       this.passwordFocusOut = true;
       if (test) {
         this.passwordStrong = true;
+        this.passwordStrengthMessage = "";
       } else {
         this.passwordStrong = false;
+        this.passwordStrengthMessage =
+          "Password should meet the following conditions" +
+          (regExpressSetting && regExpressSetting?.value
+            ? "Pattern: " + regExpressSetting?.value
+            : passwordMinLengthSetting?.value
+            ? passwordMinLengthSetting?.value
+            : "");
       }
     }
   }

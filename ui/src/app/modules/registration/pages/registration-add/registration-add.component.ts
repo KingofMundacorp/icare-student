@@ -3,7 +3,7 @@ import { MatSnackBar } from "@angular/material/snack-bar";
 import { Router } from "@angular/router";
 import { Store } from "@ngrx/store";
 import {
-  getAgeInYearsMontthsDays,
+  getAgeInYearsMonthsDays,
   getDateDifferenceYearsMonthsDays,
 } from "src/app/shared/helpers/date.helpers";
 import {
@@ -45,6 +45,8 @@ import { map, tap } from "rxjs/operators";
 import { Dropdown } from "src/app/shared/modules/form/models/dropdown.model";
 import { PatientService } from "src/app/shared/resources/patient/services/patients.service";
 import { Field } from "src/app/shared/modules/form/models/field.model";
+import { GoogleAnalyticsService } from "src/app/google-analytics.service";
+import { MatSelectChange } from "@angular/material/select";
 @Component({
   selector: "app-registration-add",
   templateUrl: "./registration-add.component.html",
@@ -123,7 +125,8 @@ export class RegistrationAddComponent implements OnInit {
     private systemSettingsService: SystemSettingsService,
     private identifierService: IdentifiersService,
     private conceptService: ConceptsService,
-    private patientService: PatientService
+    private patientService: PatientService,
+    private googleAnalyticsService: GoogleAnalyticsService
   ) {}
 
   get mandatoryFieldsMissing(): boolean {
@@ -146,6 +149,7 @@ export class RegistrationAddComponent implements OnInit {
     id: "",
     format: "",
   };
+  definedIdentifierTypes: any[] = [];
   loadingForm: boolean;
   loadingFormError: string;
 
@@ -201,7 +205,7 @@ export class RegistrationAddComponent implements OnInit {
     required: true,
     type: "number",
     min: 0,
-    placeholder: "Mobile number",
+    placeholder: "Start with 0xxxxxxxxx",
     category: "phoneNumber",
     // value: this?.editMode ? this    ""
   });
@@ -274,7 +278,7 @@ export class RegistrationAddComponent implements OnInit {
 
     // let birthdate = new Date(this.patient?.dob);
     // let ageObject = getDateDifferenceYearsMonthsDays(birthdate, new Date());
-    let ageObject = getAgeInYearsMontthsDays(this.patient?.dob);
+    let ageObject = getAgeInYearsMonthsDays(this.patient?.dob);
 
     this.patient.age = {
       ...this.patient.age,
@@ -441,7 +445,7 @@ export class RegistrationAddComponent implements OnInit {
     this.residenceDetailsLocation$ = this.locationService.getLocationById(
       this.residenceDetailsLocationUuid
     );
-    this.currentLocation$ = this.store.select(getCurrentLocation);
+    this.currentLocation$ = this.store.select(getCurrentLocation(false));
     this.showPatientType$ =
       this.systemSettingsService.getSystemSettingsDetailsByKey(
         `icare.registration.settings.showPatientTypeField`
@@ -546,6 +550,18 @@ export class RegistrationAddComponent implements OnInit {
               this.patientIdentifierTypes
             );
 
+            this.definedIdentifierTypes = !this.patientInformation
+              ? []
+              : (
+                  this.patientInformation?.patient?.identifiers?.map(
+                    (identifier: any) => {
+                      return this.otherPatientIdentifierTypes.find(
+                        (identifierType) =>
+                          identifierType.id === identifier?.identifierType?.uuid
+                      );
+                    }
+                  ) || []
+                )?.filter((identifierType: any) => identifierType);
             const otherIdentifierObject =
               this.patientInformation?.patient?.identifiers?.filter(
                 (identifier) => {
@@ -561,24 +577,27 @@ export class RegistrationAddComponent implements OnInit {
                   return attribute.attributeType.display === "patientType";
                 }
               )[0]?.value;
-            // otherIdentifierObject?.identifierType?.uuid ===
-            // ("6e7203dd-0d6b-4c92-998d-fdc82a71a1b0" ||
-            //   "9f6496ec-cf8e-4186-b8fc-aaf9e93b3406")
-            //   ? otherIdentifierObject?.identifierType?.display?.split(" ")[0]
-            //   : "Other";
 
+            // TODO: Consider reviewing these two lines as they might be duplicate with the afterwards logic
             this.selectedIdentifierType.id =
               otherIdentifierObject?.identifierType?.uuid;
 
             this.patient[this.selectedIdentifierType?.id] =
               otherIdentifierObject?.identifier;
-            // this.selectedIdentifierType.id = 6e7203dd-0d6b-4c92-998d-fdc82a71a1b0 sTAFF
 
-            //   this.patientInformation?.patient?.identifiers.filter(
-            //     (identifier) =>
-            //       identifier.identifierType.display === "Student ID" ||
-            //       "Staff ID"
-            //   )[0]?.identifier;
+            if (
+              this.patientInformation &&
+              this.patientInformation?.patient?.identifiers?.length > 0
+            ) {
+              this.definedIdentifierTypes.forEach((identifierType) => {
+                this.patient[identifierType.id] =
+                  this.patientInformation?.patient?.identifiers?.find(
+                    (identifier) =>
+                      identifier.identifierType.uuid === identifierType.id
+                  )?.identifier;
+              });
+            }
+
             this.patient.dob =
               this.patientInformation.patient?.person?.birthdate;
             this.dateSet();
@@ -600,9 +619,8 @@ export class RegistrationAddComponent implements OnInit {
                   return attribute.attributeType.display === "kinPhone";
                 }
               )[0]?.value;
-            this.residenceField.value = this.residenceField.searchTerm = this
-              ?.patientInformation?.patient?.person?.preferredAddress
-              ?.cityVillage
+            this.residenceField.value = this?.patientInformation?.patient
+              ?.person?.preferredAddress?.cityVillage
               ? this?.patientInformation?.patient?.person?.preferredAddress
                   ?.cityVillage
               : this?.patientInformation?.patient?.person?.preferredAddress
@@ -860,10 +878,15 @@ export class RegistrationAddComponent implements OnInit {
         //TODO: add check for edit mode to see if can create or edit mode
         if (this.editMode) {
           this.registrationService
-            .updatePatient(patientPayload, this.patientInformation?.id)
+            .updatePatient(
+              patientPayload,
+              this.patientInformation?.id,
+              this.patientInformation?.patient?.identifiers
+            )
             .subscribe(
               (updatePatientResponse) => {
                 if (!updatePatientResponse?.error) {
+                  this.trackActionForAnalytics(`Save Registration: Edit`);
                   this.notificationService.show(
                     new Notification({
                       message: "Patient details updated succesfully",
@@ -957,6 +980,7 @@ export class RegistrationAddComponent implements OnInit {
                             .open(StartVisitModelComponent, {
                               width: "85%",
                               data: { patient: patientResponse },
+                              disableClose: false,
                             })
                             .afterClosed()
                             .subscribe((visitDetails) => {
@@ -997,6 +1021,17 @@ export class RegistrationAddComponent implements OnInit {
         this.openSnackBar("Error: location is not set", null);
       }
     }
+
+    this.trackActionForAnalytics(`Save Registration: Save`);
+  }
+
+  trackActionForAnalytics(eventname: any) {
+    // Send data to Google Analytics
+    this.googleAnalyticsService.sendAnalytics(
+      "Registration",
+      eventname,
+      "Registration"
+    );
   }
 
   openSnackBar(message: string, action: string) {
@@ -1062,10 +1097,13 @@ export class RegistrationAddComponent implements OnInit {
     }
   }
 
-  onSelectOtherIdentifier(e: Event, identifier: any): void {
-    e.stopPropagation();
-    this.selectedIdentifierType = identifier;
-    this.patient[identifier.id] = null;
+  onSelectOtherIdentifier(e: MatSelectChange): void {
+    this.definedIdentifierTypes = e.value;
+    this.definedIdentifierTypes.forEach((identifierType: any) => {
+      if (!this.patient[identifierType.id]) {
+        this.patient[identifierType.id] = null;
+      }
+    });
   }
 
   getPatientType(value: string, occupationInfo) {
@@ -1175,7 +1213,7 @@ export class RegistrationAddComponent implements OnInit {
   }
 
   validateNamesInputs(value, key) {
-    var regex = /^[a-zA-Z ]{2,30}$/;
+    var regex = /^[a-zA-Z' ]{2,30}$/;
     this.validatedTexts[key] = regex.test(value) ? "valid" : "invalid";
   }
 

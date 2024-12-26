@@ -26,6 +26,7 @@ import { PatientListDialogComponent } from "../../dialogs";
 import { MatDialog } from "@angular/material/dialog";
 import { addCurrentPatient, go } from "src/app/store/actions";
 import { SystemSettingsService } from "src/app/core/services/system-settings.service";
+import { GoogleAnalyticsService } from "src/app/google-analytics.service";
 
 @Component({
   selector: "app-patient-list",
@@ -49,10 +50,13 @@ export class PatientListComponent implements OnInit, OnChanges {
   @Input() orderByDirection: string;
   @Input() doNotUseLocation: boolean;
   @Input() encounterType: string;
+  @Input() includeDeadPatients: boolean;
+  @Input() isDischarge?: boolean = false;
 
   page: number = 0;
   visits$: Observable<Visit[]>;
   filteredVisits$: Observable<Visit[]>;
+  dischargedPatientsVisits$:Observable<Visit[]>;
   searchTerm: string;
   loadingPatients: boolean;
   locationsUuids: string[] = [];
@@ -72,12 +76,16 @@ export class PatientListComponent implements OnInit, OnChanges {
     private route: ActivatedRoute,
     private router: Router,
     private dialog: MatDialog,
-    private systemSettingsService: SystemSettingsService
+    private systemSettingsService: SystemSettingsService,
+    private googleAnalyticsService: GoogleAnalyticsService
   ) {}
 
   ngOnChanges() {}
 
   ngOnInit() {
+    if (this.isDischarge === undefined) {
+      this.isDischarge = false;
+    }
     this.filters$ = this.systemSettingsService
       .getSystemSettingsMatchingAKey(
         "iCare.filters." + (this.filterCategory ? this.filterCategory : "")
@@ -94,11 +102,17 @@ export class PatientListComponent implements OnInit, OnChanges {
       this.paymentTypeSelected = this.defaultFilter;
     }
     this.itemsPerPage = this.itemsPerPage ? this.itemsPerPage : 10;
+    // if (this.filterCategory === "billing") {
+    //   this.includeDeadPatients = true;
+    // }
     this.getVisits(this.visits);
   }
 
+
   private getVisits(visits: Visit[]) {
     this.loadingPatients = true;
+    console.log("visit ----- ")
+    // this.service = "LABS";
     this.visits$ = visits
       ? of(visits)
       : this.service && this.service === "LABS"
@@ -110,7 +124,7 @@ export class PatientListComponent implements OnInit, OnChanges {
       : this.visitService
           .getAllVisits(
             !this.doNotUseLocation ? this.currentLocation : null,
-            false,
+            this.isDischarge ? true:false,
             false,
             null,
             this.startingIndex,
@@ -121,7 +135,10 @@ export class PatientListComponent implements OnInit, OnChanges {
             this.orderBy ? this.orderBy : "ENCOUNTER",
             this.orderByDirection ? this.orderByDirection : "ASC",
             this.filterBy ? this.filterBy : "",
-            this.encounterType
+            this.encounterType,
+            null,
+            null,
+            this.includeDeadPatients
           )
           .pipe(
             tap((response: any) => {
@@ -131,7 +148,11 @@ export class PatientListComponent implements OnInit, OnChanges {
               }
             })
           );
+          this.visits$.subscribe((visit)=>{
+            console.log("visit data .....",visit)
+          });
   }
+
 
   getAnotherList(event: Event, visit, type): void {
     const details = {
@@ -161,7 +182,7 @@ export class PatientListComponent implements OnInit, OnChanges {
         : this.visitService
             .getAllVisits(
               this.currentLocation,
-              false,
+              this.isDischarge ? true:false,
               false,
               this.searchTerm,
               details.visit?.pager
@@ -176,7 +197,10 @@ export class PatientListComponent implements OnInit, OnChanges {
               this.orderBy ? this.orderBy : "ENCOUNTER",
               this.orderByDirection ? this.orderByDirection : "ASC",
               this.filterBy,
-              this.encounterType
+              this.encounterType,
+              null,
+              null,
+              this.includeDeadPatients
             )
             .pipe(
               tap((response: any) => {
@@ -195,7 +219,7 @@ export class PatientListComponent implements OnInit, OnChanges {
     this.visits$ = this.visitService
       .getAllVisits(
         this.currentLocation,
-        false,
+        this.isDischarge ? true:false,
         false,
         this.searchTerm,
         0,
@@ -206,7 +230,10 @@ export class PatientListComponent implements OnInit, OnChanges {
         this.orderBy ? this.orderBy : "ENCOUNTER",
         this.orderByDirection ? this.orderByDirection : "ASC",
         this.filterBy ? this.filterBy : "",
-        this.encounterType
+        this.encounterType,
+        null,
+        null,
+        this.includeDeadPatients
       )
       .pipe(
         tap((response: any) => {
@@ -236,6 +263,13 @@ export class PatientListComponent implements OnInit, OnChanges {
     this.store.dispatch(clearBillItems());
     this.store.dispatch(clearActiveVisit());
     this.selectPatient.emit({ ...visit?.patient, visitUuid: visit?.uuid });
+
+      // this.trackActionForAnalytics(`Active Patient Search: View`)
+  
+  }
+  trackActionForAnalytics(eventname: any) {
+    // Send data to Google Analytics
+   this.googleAnalyticsService.sendAnalytics('Registration',eventname,'Registration')
   }
 
   togglePatientTypeList(type) {
@@ -281,8 +315,8 @@ export class PatientListComponent implements OnInit, OnChanges {
           );
         }
       });
+      
   }
-
   filterPatientList(event: any) {
     this.loadingPatients = true;
 
@@ -302,7 +336,10 @@ export class PatientListComponent implements OnInit, OnChanges {
         this.orderBy ? this.orderBy : "ENCOUNTER",
         this.orderByDirection ? this.orderByDirection : "ASC",
         this.filterBy,
-        this.encounterType
+        this.encounterType,
+        null,
+        null,
+        this.includeDeadPatients
       )
       .pipe(
         tap((response: any) => {
