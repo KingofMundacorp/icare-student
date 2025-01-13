@@ -29,7 +29,8 @@ const routes: Routes = [
       {
         path: "sample-collection",
         loadChildren: () =>
-          import("./modules/sample-collection/sample-collection.module").then(
+          import(
+            "./modules/sample-collection/sample-collection.module").then(
             (m) => m.SampleCollectionModule
           ),
       },
