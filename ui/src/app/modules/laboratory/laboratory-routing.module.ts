@@ -15,7 +15,8 @@ const routes: Routes = [
       {
         path: "dashboard-lab",
         loadChildren: () =>
-          import("./modules/dashboard/dashboard.module").then(
+          import(
+            "./modules/dashboard/dashboard.module").then(
             (m) => m.DashboardModule
           ),
       },
@@ -30,9 +31,8 @@ const routes: Routes = [
         path: "sample-collection",
         loadChildren: () =>
           import(
-            "./modules/sample-collection/sample-collection.module").then(
-            (m) => m.SampleCollectionModule
-          ),
+            "./modules/sample-collection/sample-collection.module"
+          ).then((m) => m.SampleCollectionModule),
       },
       {
         path: "lab-investigation-home",
@@ -44,21 +44,24 @@ const routes: Routes = [
       {
         path: "sample-tracking",
         loadChildren: () =>
-          import("./modules/sample-tracking/sample-tracking.module").then(
+          import(
+            "./modules/sample-tracking/sample-tracking.module").then(
             (m) => m.SampleTrackingModule
           ),
       },
       {
         path: "settings",
         loadChildren: () =>
-          import("./modules/settings/settings.module").then(
+          import(
+            "./modules/settings/settings.module").then(
             (m) => m.SettingsModule
           ),
       },
       {
         path: "reports",
         loadChildren: () =>
-          import("./modules/lab-reports/reports.module").then(
+          import(
+            "./modules/lab-reports/reports.module").then(
             (m) => m.ReportsModule
           ),
       },
@@ -72,14 +75,16 @@ const routes: Routes = [
       {
         path: "sample-results-list",
         loadChildren: () =>
-          import("./modules/sample-results/sample-results.module").then(
+          import(
+            "./modules/sample-results/sample-results.module").then(
             (m) => m.SampleResultsModule
           ),
       },
       {
         path: "sample-storage",
         loadChildren: () =>
-          import("./modules/sample-storage/sample-storage.module").then(
+          import(
+            "./modules/sample-storage/sample-storage.module").then(
             (m) => m.SampleStorageModule
           ),
       },
